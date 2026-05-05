@@ -1,0 +1,47 @@
+{
+  "class_names": [
+    "digit_0",
+    "digit_1",
+    "digit_2",
+    "digit_3",
+    "digit_4",
+    "digit_5",
+    "digit_6",
+    "digit_7",
+    "digit_8",
+    "digit_9"
+  ],
+  "devanagari_digits": [
+    "०",
+    "१",
+    "२",
+    "३",
+    "४",
+    "५",
+    "६",
+    "७",
+    "८",
+    "९"
+  ],
+  "unicode_codes": [
+    "U+0966",
+    "U+0967",
+    "U+0968",
+    "U+0969",
+    "U+096A",
+    "U+096B",
+    "U+096C",
+    "U+096D",
+    "U+096E",
+    "U+096F"
+  ],
+  "image_size": [
+    32,
+    32
+  ],
+  "model_type": "SmallDevanagariCNN",
+  "framework": "PyTorch",
+  "num_params": 290002,
+  "best_val_accuracy": 0.9970588235294118,
+  "test_accuracy": 0.996
+}

@@ -1,9 +1,10 @@
-scikit-learn
-matplotlib
-seaborn
+numpy
+pandas
 pillow
+seaborn
+matplotlib
+scikit-learn
 streamlit
 streamlit-drawable-canvas
 ipykernel
 torch
-pandas
