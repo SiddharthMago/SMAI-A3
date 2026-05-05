@@ -1,0 +1,9 @@
+scikit-learn
+matplotlib
+seaborn
+pillow
+streamlit
+streamlit-drawable-canvas
+ipykernel
+torch
+pandas
