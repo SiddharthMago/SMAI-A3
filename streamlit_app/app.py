@@ -23,6 +23,27 @@ MODEL_PATH = APP_DIR / "models" / "devanagari_digit_cnn.pt"
 META_PATH = APP_DIR / "models" / "class_metadata.json"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+CLASS_DRAWING_TIPS = {
+    0: "keep the loop closed and avoid adding tails that resemble another digit",
+    1: "use a clear single main stroke with enough contrast from the background",
+    2: "make the lower stroke distinct so it does not look like a rounded 3",
+    3: "keep the upper curve and descending stroke clear without forming a 2-like base",
+    4: "make the crossing structure and lower curve visible",
+    5: "separate the top and lower strokes so it does not collapse into a 2-like shape",
+    6: "keep the lower loop closed and the upper stroke compact",
+    7: "use a clean diagonal/curved body without extra loops",
+    8: "make both loops visible and balanced",
+    9: "keep the top loop clear and avoid a lower stroke that resembles 2",
+}
+
+PAIR_FEEDBACK = {
+    (2, 3): "This is a common confusion: a rounded top and right-side descending stroke can make 2 resemble 3. Emphasize the lower/base stroke of 2.",
+    (3, 2): "The sample may have a stronger lower stroke than expected for 3, making it closer to 2. Try making the 3-like curve more continuous.",
+    (5, 2): "The lower part may resemble the base of 2. Try making the distinctive top stroke of 5 clearer.",
+    (9, 2): "The bottom stroke may be pulling the image toward 2. Try keeping the upper loop of 9 more dominant.",
+    (4, 5): "The crossing and lower curve can resemble 5 if the central structure is unclear. Try separating the main strokes more clearly.",
+}
+
 
 @st.cache_resource
 def load_model_and_metadata():
@@ -114,6 +135,57 @@ def predict(image, model, metadata, polarity="light_on_dark"):
     }
 
 
+def foreground_stats(preview):
+    arr = np.array(preview, dtype=np.uint8)
+    foreground = arr > 20
+    if not foreground.any():
+        return {"ink_ratio": 0.0, "center_offset": 1.0}
+
+    ys, xs = np.where(foreground)
+    ink_ratio = float(foreground.mean())
+    center_y = float(ys.mean()) / max(arr.shape[0] - 1, 1)
+    center_x = float(xs.mean()) / max(arr.shape[1] - 1, 1)
+    center_offset = abs(center_x - 0.5) + abs(center_y - 0.5)
+    return {"ink_ratio": ink_ratio, "center_offset": center_offset}
+
+
+def practice_feedback(result, target, metadata):
+    pred = result["class_index"]
+    probs = result["probabilities"]
+    stats = foreground_stats(result["preview"])
+    target_prob = float(probs[target])
+    pred_prob = float(probs[pred])
+    gap = pred_prob - target_prob
+
+    target_label = f"{metadata['devanagari_digits'][target]} ({metadata['unicode_codes'][target]})"
+    pred_label = f"{metadata['devanagari_digits'][pred]} ({metadata['unicode_codes'][pred]})"
+
+    if pred == target:
+        return [
+            f"The drawing matches the target {target_label}. The model assigned {pred_prob:.1%} confidence to this class.",
+            "For more stable predictions, keep the digit centered and use a complete, high-contrast stroke.",
+        ]
+
+    feedback = [
+        f"The model favored {pred_label} over the target {target_label}: {pred_prob:.1%} vs {target_prob:.1%} confidence.",
+        PAIR_FEEDBACK.get(
+            (target, pred),
+            f"To move the prediction toward the target, try to emphasize the target digit's distinctive structure: {CLASS_DRAWING_TIPS[target]}.",
+        ),
+    ]
+
+    if gap < 0.15:
+        feedback.append("The probabilities are close, so this is an ambiguous sample; a small stroke change may be enough.")
+    if stats["ink_ratio"] < 0.05:
+        feedback.append("The digit looks very thin or incomplete after preprocessing; draw with a fuller continuous stroke.")
+    elif stats["ink_ratio"] > 0.45:
+        feedback.append("The digit fills a large part of the 32x32 input; leaving more empty margin may help.")
+    if stats["center_offset"] > 0.30:
+        feedback.append("The digit is off-center after preprocessing; centering it can improve recognition.")
+
+    return feedback
+
+
 model, metadata = load_model_and_metadata()
 digits = metadata["devanagari_digits"]
 unicode_codes = metadata["unicode_codes"]
@@ -186,6 +258,10 @@ if input_image is not None:
                 st.success("Correct target digit.")
             else:
                 st.warning(f"Target was {digits[target]} ({unicode_codes[target]}).")
+
+            with st.expander("Practice feedback", expanded=result["class_index"] != target):
+                for note in practice_feedback(result, target, metadata):
+                    st.write(f"- {note}")
 
     chart_data = pd.DataFrame(
         {
